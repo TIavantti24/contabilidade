@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Importar Planilhas{% endblock %}
+{% block page_title %}Importar Planilhas{% endblock %}
+
+{% block content %}
+
+{# ══ TAB SWITCHER ══ #}
+<div style="display:flex;gap:4px;margin-bottom:24px;background:#f4f5f7;padding:4px;border-radius:10px;width:fit-content">
+  <button onclick="showTab('indicadores')" id="tab-indicadores"
+          style="padding:8px 22px;border-radius:7px;border:none;font-family:inherit;font-size:.875rem;
+                 font-weight:600;cursor:pointer;background:#c0392b;color:#fff;transition:all .2s">
+    📊 Indicadores STRATWs
+  </button>
+  <button onclick="showTab('custo')" id="tab-custo"
+          style="padding:8px 22px;border-radius:7px;border:none;font-family:inherit;font-size:.875rem;
+                 font-weight:600;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s">
+    💰 Custo Fixo
+  </button>
+</div>
+
+{# ══ PANEL: INDICADORES ══ #}
+<div id="panel-indicadores">
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start">
+
+    <div class="card">
+      <div class="card-header">
+        <h2>📂 Enviar Planilha de Indicadores</h2>
+        <span class="badge badge-blue">Admin only</span>
+      </div>
+      <div class="card-body">
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:.85rem;color:#92400e">
+          <strong>⚠️ Atenção:</strong> substitui <strong>todos</strong> os indicadores existentes pelos dados da nova planilha.
+        </div>
+        <form method="POST" action="{{ url_for('admin_importar') }}" enctype="multipart/form-data" id="formInd">
+          <div id="dropInd" onclick="document.getElementById('fileInd').click()"
+               style="border:2px dashed #d1d5db;border-radius:12px;padding:48px 24px;
+                      text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px">
+            <div id="iconInd" style="font-size:3rem;margin-bottom:12px">📊</div>
+            <div id="txtInd" style="font-weight:600">Clique ou arraste o arquivo aqui</div>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:6px">.xlsx / .xls — máx 20 MB</div>
+            <input type="file" id="fileInd" name="planilha" accept=".xlsx,.xls" style="display:none" onchange="handleDrop('Ind',this)"/>
+          </div>
+          <div id="infoInd" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+               padding:12px 16px;margin-bottom:20px;align-items:center;gap:12px">
+            <span style="font-size:1.4rem">📄</span>
+            <div><div id="nameInd" style="font-weight:600;font-size:.9rem"></div>
+                 <div id="sizeInd" style="font-size:.75rem;color:var(--muted)"></div></div>
+            <button type="button" onclick="clearDrop('Ind')" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--muted)">✕</button>
+          </div>
+          <button type="submit" id="btnInd" class="btn btn-primary" disabled
+                  style="width:100%;justify-content:center;padding:12px">
+            <span id="lblInd">Selecione um arquivo para importar</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="card-header"><h2>Status atual</h2></div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:2.5rem;font-weight:700;font-family:'DM Mono',monospace;color:var(--red)">{{ total_ind }}</div>
+            <div style="color:var(--muted);font-size:.85rem">indicadores<br>no banco</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Colunas obrigatórias</h2></div>
+        <div class="card-body" style="font-size:.8rem">
+          {% for col in ['PLANO DE GESTÃO','SIGLA UNIDADE','ÁREA DE RESULTADO','SIGLA TIPO ACOMPANHAMENTO','Status','NOME DO INDICADOR','UNIDADE DE MEDIDA','MELHOR','FREQUÊNCIA','RESPONSÁVEL','FORMA ACÚMULO','REA_JAN … REA_DEZ','MET_JAN … MET_DEZ'] %}
+          <div style="padding:4px 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.76rem">{{ col }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if logs_ind %}
+  <div class="card" style="margin-top:24px">
+    <div class="card-header"><h2>Histórico — Indicadores</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Arquivo</th><th>Data/Hora</th><th>Registros</th><th>Por</th></tr></thead>
+        <tbody>
+          {% for log in logs_ind %}
+          <tr>
+            <td style="font-family:'DM Mono',monospace;font-size:.8rem">{{ log.filename }}</td>
+            <td style="color:var(--muted);font-size:.82rem">{{ log.imported_at.strftime('%d/%m/%Y %H:%M') if log.imported_at else '—' }}</td>
+            <td><strong>{{ log.total }}</strong></td>
+            <td>{{ log.imported_by or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ══ PANEL: CUSTO FIXO ══ #}
+<div id="panel-custo" style="display:none">
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start">
+
+    <div class="card">
+      <div class="card-header">
+        <h2>💰 Enviar Planilha de Custo Fixo</h2>
+        <span class="badge badge-amber">Admin only</span>
+      </div>
+      <div class="card-body">
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:.85rem;color:#92400e">
+          <strong>⚠️ Atenção:</strong> substitui <strong>todos</strong> os registros de custo fixo existentes.
+        </div>
+        <form method="POST" action="{{ url_for('admin_importar_custo') }}" enctype="multipart/form-data" id="formCusto">
+          <div id="dropCusto" onclick="document.getElementById('fileCusto').click()"
+               style="border:2px dashed #d1d5db;border-radius:12px;padding:48px 24px;
+                      text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px">
+            <div id="iconCusto" style="font-size:3rem;margin-bottom:12px">💰</div>
+            <div id="txtCusto" style="font-weight:600">Clique ou arraste o arquivo aqui</div>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:6px">.xlsx / .xls — máx 20 MB</div>
+            <input type="file" id="fileCusto" name="planilha_custo" accept=".xlsx,.xls" style="display:none" onchange="handleDrop('Custo',this)"/>
+          </div>
+          <div id="infoCusto" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+               padding:12px 16px;margin-bottom:20px;align-items:center;gap:12px">
+            <span style="font-size:1.4rem">📄</span>
+            <div><div id="nameCusto" style="font-weight:600;font-size:.9rem"></div>
+                 <div id="sizeCusto" style="font-size:.75rem;color:var(--muted)"></div></div>
+            <button type="button" onclick="clearDrop('Custo')" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--muted)">✕</button>
+          </div>
+          <button type="submit" id="btnCusto" class="btn btn-primary" disabled
+                  style="width:100%;justify-content:center;padding:12px;background:#d97706">
+            <span id="lblCusto">Selecione um arquivo para importar</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="card-header"><h2>Status atual</h2></div>
+        <div class="card-body">
+          <div style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:2.5rem;font-weight:700;font-family:'DM Mono',monospace;color:#d97706">{{ total_custo }}</div>
+            <div style="color:var(--muted);font-size:.85rem">registros de<br>custo fixo</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Colunas obrigatórias</h2></div>
+        <div class="card-body" style="font-size:.8rem">
+          {% for col in ['Atividade','Descrição','Data (dd/mm/aaaa)','REALIZADO','ORÇADO'] %}
+          <div style="padding:4px 0;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.76rem">{{ col }}</div>
+          {% endfor %}
+          <p style="font-size:.75rem;color:var(--muted);margin-top:10px">
+            Uma linha por atividade/mês.<br>Aba: <strong>Planilha1</strong> (padrão) ou qualquer aba única.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(tab) {
+  document.getElementById('panel-indicadores').style.display = tab === 'indicadores' ? '' : 'none';
+  document.getElementById('panel-custo').style.display       = tab === 'custo'        ? '' : 'none';
+  document.getElementById('tab-indicadores').style.background = tab === 'indicadores' ? '#c0392b' : 'transparent';
+  document.getElementById('tab-indicadores').style.color      = tab === 'indicadores' ? '#fff'    : 'var(--muted)';
+  document.getElementById('tab-custo').style.background = tab === 'custo' ? '#d97706' : 'transparent';
+  document.getElementById('tab-custo').style.color      = tab === 'custo' ? '#fff'    : 'var(--muted)';
+}
+
+function fmt(b) {
+  if (b<1024) return b+' B';
+  if (b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(2)+' MB';
+}
+
+function handleDrop(key, input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('name'+key).textContent = file.name;
+  document.getElementById('size'+key).textContent = fmt(file.size);
+  document.getElementById('info'+key).style.display = 'flex';
+  document.getElementById('drop'+key).style.borderColor = '#16a34a';
+  document.getElementById('drop'+key).style.background  = '#f0fdf4';
+  document.getElementById('icon'+key).textContent = '✅';
+  document.getElementById('txt'+key).textContent  = 'Arquivo pronto para importar';
+  document.getElementById('btn'+key).disabled     = false;
+  document.getElementById('lbl'+key).textContent  = 'Importar "'+file.name+'"';
+}
+
+function clearDrop(key) {
+  document.getElementById('file'+key).value = '';
+  document.getElementById('info'+key).style.display   = 'none';
+  document.getElementById('drop'+key).style.borderColor = '#d1d5db';
+  document.getElementById('drop'+key).style.background  = '';
+  document.getElementById('icon'+key).textContent = key==='Ind' ? '📊' : '💰';
+  document.getElementById('txt'+key).textContent  = 'Clique ou arraste o arquivo aqui';
+  document.getElementById('btn'+key).disabled     = true;
+  document.getElementById('lbl'+key).textContent  = 'Selecione um arquivo para importar';
+}
+
+// Drag & drop for both zones
+['Ind','Custo'].forEach(key => {
+  const zone = document.getElementById('drop'+key);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor='#c0392b'; zone.style.background='#fff5f5'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor='#d1d5db'; zone.style.background=''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    const inp = document.getElementById('file'+key);
+    inp.files = e.dataTransfer.files;
+    handleDrop(key, inp);
+  });
+});
+
+// Loading state
+['formInd','formCusto'].forEach(id => {
+  document.getElementById(id).addEventListener('submit', function() {
+    const key = id === 'formInd' ? 'Ind' : 'Custo';
+    document.getElementById('btn'+key).disabled = true;
+    document.getElementById('lbl'+key).textContent = '⏳ Importando… aguarde';
+  });
+});
+
+// Auto-switch tab if flash came from custo import
+{% if request.endpoint == 'admin_importar' and 'Custo Fixo' in (get_flashed_messages()|join(' ')) %}
+showTab('custo');
+{% endif %}
+</script>
+{% endblock %}

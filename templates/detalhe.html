@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ ind.nome[:50] }}{% endblock %}
+{% block page_title %}Detalhe do Indicador{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('indicadores') }}" class="btn btn-outline btn-sm">← Voltar</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+  <div class="card" style="grid-column:1/-1">
+    <div class="card-header">
+      <div>
+        <h2 style="font-size:1.05rem">{{ ind.nome }}</h2>
+        <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+          {% if ind.status == 'Ativo' %}
+            <span class="badge badge-green">Ativo</span>
+          {% else %}
+            <span class="badge badge-gray">Inativo</span>
+          {% endif %}
+          <span class="badge badge-blue">{{ ind.sigla_unidade }}</span>
+          <span class="badge badge-amber">{{ ind.area_resultado }}</span>
+          <code style="font-size:.72rem;background:#f3f4f6;padding:2px 8px;border-radius:4px">{{ ind.tipo }}</code>
+        </div>
+      </div>
+      <div style="text-align:right;color:var(--muted);font-size:.8rem">
+        <div>Ano: <strong>{{ ind.plano_gestao }}</strong></div>
+        <div>Frequência: <strong>{{ ind.frequencia }}</strong></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px">
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Unidade de Medida</div>
+          <strong>{{ ind.unidade_medida or '—' }}</strong>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Melhor Direção</div>
+          <strong>{{ ind.melhor or '—' }}</strong>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Forma de Acúmulo</div>
+          <strong>{{ ind.forma_acumulo or '—' }}</strong>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Responsável</div>
+          <strong style="font-size:.85rem">{{ ind.responsavel or '—' }}</strong>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Tolerância Verde</div>
+          <strong>{{ ind.tolerancia_verde if ind.tolerancia_verde is not none else '—' }}</strong>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Tolerância Amarelo</div>
+          <strong>{{ ind.tolerancia_amar if ind.tolerancia_amar is not none else '—' }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2>Gráfico de Evolução — Realizado vs. Meta</h2></div>
+  <div class="card-body">
+    <canvas id="chartEvolucao" height="100"></canvas>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px">
+  <div class="card-header"><h2>Valores Mensais</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Mês</th>
+          {% for m in ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+          <th>{{ m }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Realizado</strong></td>
+          {% for v in chart_data.realizado %}
+          <td style="font-family:'DM Mono',monospace;font-size:.8rem">
+            {{ '%.2f'|format(v) if v is not none else '—' }}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td><strong>Meta</strong></td>
+          {% for v in chart_data.meta %}
+          <td style="font-family:'DM Mono',monospace;font-size:.8rem">
+            {{ '%.2f'|format(v) if v is not none else '—' }}
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const labels    = {{ chart_data.labels | tojson }};
+const realizado = {{ chart_data.realizado | tojson }};
+const meta      = {{ chart_data.meta | tojson }};
+
+new Chart(document.getElementById('chartEvolucao'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'Realizado',
+        data: realizado,
+        borderColor: '#c0392b',
+        backgroundColor: 'rgba(192,57,43,.08)',
+        fill: true,
+        tension: .3,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+      },
+      {
+        label: 'Meta',
+        data: meta,
+        borderColor: '#2563eb',
+        borderDash: [6,3],
+        backgroundColor: 'transparent',
+        tension: .3,
+        pointRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { beginAtZero: false, ticks: { precision: 2 } }
+    }
+  }
+});
+</script>
+{% endblock %}

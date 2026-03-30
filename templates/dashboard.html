@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card" style="--accent:#c0392b">
+    <div class="label">Total de Indicadores</div>
+    <div class="value">{{ total }}</div>
+    <div class="sub">Todos os anos e unidades</div>
+  </div>
+  <div class="stat-card" style="--accent:#16a34a">
+    <div class="label">Ativos</div>
+    <div class="value">{{ ativos }}</div>
+    <div class="sub">Em acompanhamento</div>
+  </div>
+  <div class="stat-card" style="--accent:#6b7280">
+    <div class="label">Inativos</div>
+    <div class="value">{{ inativos }}</div>
+    <div class="sub">Desativados</div>
+  </div>
+  <div class="stat-card" style="--accent:#2563eb">
+    <div class="label">Unidades Gerenciais</div>
+    <div class="value">{{ unidades|length }}</div>
+    <div class="sub">Áreas de negócio</div>
+  </div>
+</div>
+
+<div class="charts-grid">
+  <div class="card">
+    <div class="card-header"><h2>Indicadores por Área de Resultado</h2></div>
+    <div class="card-body"><canvas id="chartAreas" height="220"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Indicadores por Unidade Gerencial</h2></div>
+    <div class="card-body"><canvas id="chartUnidades" height="220"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Evolução por Plano de Gestão (Ano)</h2></div>
+    <div class="card-body"><canvas id="chartAnos" height="220"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2>Distribuição por Status</h2></div>
+    <div class="card-body" style="display:flex;align-items:center;justify-content:center;min-height:220px;">
+      <canvas id="chartStatus" height="200" width="200"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Unidades Gerenciais</h2>
+    <a href="{{ url_for('indicadores') }}" class="btn btn-outline btn-sm">Ver todos →</a>
+  </div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Unidade Gerencial</th>
+            <th>Total de Indicadores</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ug, cnt in unidades %}
+          <tr>
+            <td><a href="{{ url_for('indicadores', unidade=ug) }}" style="color:var(--red);text-decoration:none;font-weight:500">{{ ug }}</a></td>
+            <td>{{ cnt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RED   = '#c0392b';
+const BLUE  = '#2563eb';
+const GREEN = '#16a34a';
+const AMBER = '#d97706';
+const GRAY  = '#9ca3af';
+
+// Areas
+new Chart(document.getElementById('chartAreas'), {
+  type: 'bar',
+  data: {
+    labels: {{ areas|map(attribute=0)|list|tojson }},
+    datasets: [{
+      label: 'Indicadores',
+      data: {{ areas|map(attribute=1)|list|tojson }},
+      backgroundColor: [RED, BLUE, GREEN, AMBER, GRAY],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+
+// Unidades
+new Chart(document.getElementById('chartUnidades'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ unidades|map(attribute=0)|list|tojson }},
+    datasets: [{
+      data: {{ unidades|map(attribute=1)|list|tojson }},
+      backgroundColor: [RED, BLUE, GREEN, AMBER],
+    }]
+  },
+  options: {
+    plugins: { legend: { position: 'right' } },
+    cutout: '65%'
+  }
+});
+
+// Anos
+new Chart(document.getElementById('chartAnos'), {
+  type: 'bar',
+  data: {
+    labels: {{ anos|map(attribute=0)|list|tojson }},
+    datasets: [{
+      label: 'Indicadores',
+      data: {{ anos|map(attribute=1)|list|tojson }},
+      backgroundColor: BLUE,
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+
+// Status
+new Chart(document.getElementById('chartStatus'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Ativos', 'Inativos'],
+    datasets: [{
+      data: [{{ ativos }}, {{ inativos }}],
+      backgroundColor: [GREEN, GRAY],
+    }]
+  },
+  options: {
+    plugins: { legend: { position: 'bottom' } },
+    cutout: '70%'
+  }
+});
+</script>
+{% endblock %}

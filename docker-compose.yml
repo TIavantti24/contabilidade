@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY}          # set in .env
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}  # set in .env
+      EXCEL_PATH: /data/indicadores.xlsx
+    volumes:
+      - ./instance:/app/instance         # SQLite persistence
+      - ./data:/data:ro                  # Excel read-only
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
