@@ -5,7 +5,7 @@
 {% block content %}
 <div class="card" style="margin-bottom:20px">
   <div class="card-body">
-    <form method="GET" action="{{ url_for('indicadores') }}">
+    <form method="GET" action="{{ url_for('scorecard') }}">
       <div class="form-row">
         <div class="form-group">
           <label>Buscar</label>
@@ -53,7 +53,7 @@
         {% if q or unidade or area or status_f or ano_f %}
         <div class="form-group" style="justify-content:flex-end">
           <label>&nbsp;</label>
-          <a href="{{ url_for('indicadores') }}" class="btn btn-outline">Limpar</a>
+          <a href="{{ url_for('scorecard') }}" class="btn btn-outline">Limpar</a>
         </div>
         {% endif %}
       </div>
@@ -83,7 +83,7 @@
         {% for ind in pag.items %}
         <tr>
           <td class="link-cell trunc">
-            <a href="{{ url_for('indicador_detalhe', ind_id=ind.id) }}" title="{{ ind.nome }}">{{ ind.nome }}</a>
+            <a href="{{ url_for('scorecard_detalhe', ind_id=ind.id) }}" title="{{ ind.nome }}">{{ ind.nome }}</a>
           </td>
           <td><span class="badge badge-blue">{{ ind.sigla_unidade[:6] }}</span></td>
           <td>{{ ind.area_resultado }}</td>
@@ -107,21 +107,21 @@
   <div class="card-body" style="padding-top:0">
     <div class="pagination">
       {% if pag.has_prev %}
-        <a href="{{ url_for('indicadores', page=pag.prev_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">← Anterior</a>
+        <a href="{{ url_for('scorecard', page=pag.prev_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">← Anterior</a>
       {% endif %}
       {% for p in pag.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
         {% if p %}
           {% if p == pag.page %}
             <span class="current">{{ p }}</span>
           {% else %}
-            <a href="{{ url_for('indicadores', page=p, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">{{ p }}</a>
+            <a href="{{ url_for('scorecard', page=p, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">{{ p }}</a>
           {% endif %}
         {% else %}
           <span>…</span>
         {% endif %}
       {% endfor %}
       {% if pag.has_next %}
-        <a href="{{ url_for('indicadores', page=pag.next_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">Próximo →</a>
+        <a href="{{ url_for('scorecard', page=pag.next_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}">Próximo →</a>
       {% endif %}
     </div>
   </div>

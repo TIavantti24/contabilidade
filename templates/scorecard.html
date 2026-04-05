@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+{% block title %}Scorecard{% endblock %}
+{% block page_title %}Scorecard{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Scorecard toolbar ── */
+.sc-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px;
+  margin-bottom: 18px; box-shadow: var(--shadow);
+}
+.sc-toolbar form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; flex: 1; }
+.sc-toolbar .form-group label { font-size: .7rem; }
+.sc-toolbar input[type=text] { min-width: 180px; }
+.sc-toolbar select { min-width: 110px; }
+.view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+.view-toggle a {
+  padding: 7px 14px; font-size: .78rem; font-weight: 600;
+  text-decoration: none; color: var(--muted);
+  background: var(--card); transition: background .15s, color .15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.view-toggle a.active { background: var(--red); color: #fff; }
+/* ── Scorecard table ── */
+.sc-wrap { overflow-x: auto; }
+.sc-table { width: 100%; border-collapse: collapse; font-size: .8rem; white-space: nowrap; }
+.sc-table th {
+  background: #f8f9fb; padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+  font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .7px; color: var(--muted);
+  text-align: center;
+}
+.sc-table th.left { text-align: left; }
+.sc-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.sc-table tr:hover td { background: #fafbfc; }
+.sc-group-row td {
+  background: #1a1d23; color: #fff;
+  font-weight: 700; font-size: .78rem;
+  padding: 8px 12px; letter-spacing: .5px;
+}
+.sc-name { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-name a { color: var(--red); text-decoration: none; font-weight: 500; }
+.sc-name a:hover { text-decoration: underline; }
+.sc-num { text-align: right; font-family: 'DM Mono', monospace; font-size: .78rem; }
+
+/* ── Sticky columns ── */
+.sc-table th.sticky, .sc-table td.sticky {
+  position: sticky; z-index: 2;
+}
+.sc-table th.sticky { z-index: 3; background: #f8f9fb; }
+.sc-table td.sticky { background: #fff; }
+.sc-table tr:hover td.sticky { background: #fafbfc; }
+/* shadow on last sticky col to separate from scrollable area */
+.sc-table th.sticky-last, .sc-table td.sticky-last {
+  box-shadow: 3px 0 6px -2px rgba(0,0,0,.10);
+}
+.sc-delta-pos { color: var(--green); font-weight: 600; }
+.sc-delta-neg { color: var(--red); font-weight: 600; }
+.sc-dot-cell { text-align: center; width: 28px; padding: 5px 4px; }
+.sc-icon { display: inline-block; width: 13px; height: 13px; border-radius: 50%; vertical-align: middle; }
+.sc-icon.green  { background: #16a34a; }
+.sc-icon.yellow { background: #d97706; }
+.sc-icon.gray   { background: #d1d5db; }
+/* red <=89% downward triangle */
+.sc-tri {
+  display: inline-block; width: 0; height: 0; vertical-align: middle;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 12px solid #c0392b;
+}
+/* blue 101-120% diamond */
+.sc-diamond {
+  display: inline-block; width: 11px; height: 11px; vertical-align: middle;
+  background: #2563eb; transform: rotate(45deg); border-radius: 1px;
+}
+/* orange >=121% upward triangle */
+.sc-tri-up {
+  display: inline-block; width: 0; height: 0; vertical-align: middle;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 12px solid #ea580c;
+}
+.sc-month-sep { border-left: 1px solid var(--border); }
+.sc-clickable { cursor: pointer; transition: background .15s; }
+.sc-clickable:hover { background: #f0f4ff !important; }
+/* ── Selected month highlight ── */
+.sc-clickable.selected { background: #1a1d23 !important; border-radius: 4px; }
+.sc-clickable.selected span { filter: brightness(1.4); }
+.sc-num.sc-updated {
+  transition: all .25s ease;
+  position: relative;
+}
+.sc-month-label {
+  display: block; font-size: .58rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  font-family: 'DM Sans', sans-serif; font-weight: 600;
+  margin-bottom: 1px; line-height: 1;
+}
+
+.sc-legend {
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  font-size: .73rem; color: var(--muted); margin-bottom: 12px;
+  padding: 10px 14px; background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.sc-legend-item { display: flex; align-items: center; gap: 5px; }
+/* ── Month detail popup ── */
+.sc-popup {
+  position: fixed; z-index: 9999;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  padding: 0; min-width: 220px; max-width: 260px;
+  pointer-events: auto; animation: popIn .15s ease;
+}
+@keyframes popIn {
+  from { opacity:0; transform: scale(.92) translateY(-4px); }
+  to   { opacity:1; transform: scale(1)   translateY(0); }
+}
+.sc-popup-header {
+  background: #1a1d23; color: #fff;
+  padding: 10px 14px; border-radius: 9px 9px 0 0;
+  font-size: .78rem; font-weight: 700; letter-spacing: .3px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sc-popup-close {
+  cursor: pointer; opacity: .5; font-size: 1rem; line-height: 1;
+  background: none; border: none; color: #fff; padding: 0 2px;
+}
+.sc-popup-close:hover { opacity: 1; }
+.sc-popup-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.sc-popup-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .8rem; border-bottom: 1px solid var(--border); padding-bottom: 7px;
+}
+.sc-popup-row:last-child { border-bottom: none; padding-bottom: 0; }
+.sc-popup-label { color: var(--muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.sc-popup-value { font-family: 'DM Mono', monospace; font-weight: 700; font-size: .88rem; }
+.sc-popup-pct { font-size: 1.1rem; font-weight: 800; }
+.sc-popup-indicator { font-size: .7rem; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+
+.sc-empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+.pagination { display: flex; gap: 6px; align-items: center; margin-top: 20px; }
+.pagination a, .pagination span {
+  padding: 6px 12px; border-radius: 6px; font-size: .8rem; font-weight: 600;
+  text-decoration: none; border: 1px solid var(--border);
+}
+.pagination a { color: var(--text); }
+.pagination a:hover { background: var(--bg); }
+.pagination .current { background: var(--red); color: #fff; border-color: var(--red); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sc-toolbar">
+  <form method="GET" action="{{ url_for('scorecard') }}">
+    <input type="hidden" name="view" value="{{ view_mode }}"/>
+    <div class="form-group">
+      <label>Buscar</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Nome do indicador…"/>
+    </div>
+    <div class="form-group">
+      <label>Unidade</label>
+      <select name="unidade">
+        <option value="">Todas</option>
+        {% for u in all_unidades %}
+        <option value="{{ u }}" {{ 'selected' if unidade==u }}>{{ u }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Área</label>
+      <select name="area">
+        <option value="">Todas</option>
+        {% for a in all_areas %}
+        <option value="{{ a }}" {{ 'selected' if area==a }}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select name="status">
+        <option value="">Todos</option>
+        <option value="Ativo"   {{ 'selected' if status_f=='Ativo' }}>Ativo</option>
+        <option value="Inativo" {{ 'selected' if status_f=='Inativo' }}>Inativo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Ano</label>
+      <select name="ano">
+        <option value="">Todos</option>
+        {% for a in all_anos %}
+        <option value="{{ a }}" {{ 'selected' if ano_f==a|string }}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+    </div>
+    {% if q or unidade or area or status_f or ano_f %}
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <a href="{{ url_for('scorecard', view=view_mode) }}" class="btn btn-outline">Limpar</a>
+    </div>
+    {% endif %}
+  </form>
+  <div class="view-toggle">
+    <a href="{{ url_for('scorecard', view='scorecard', q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}"
+       class="{{ 'active' if view_mode=='scorecard' }}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+      </svg>Scorecard
+    </a>
+    <a href="{{ url_for('scorecard', view='table', q=q, unidade=unidade, area=area, status=status_f, ano=ano_f) }}"
+       class="{{ 'active' if view_mode=='table' }}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+        <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+        <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>Tabela
+    </a>
+  </div>
+</div>
+
+{% if view_mode == 'scorecard' %}
+
+<div class="sc-legend">
+  <strong style="color:var(--text)">Legenda:</strong>
+  <span class="sc-legend-item"><span class="sc-tri"></span> ≤ 89% Abaixo</span>
+  <span class="sc-legend-item"><span class="sc-icon yellow"></span> 90–99% Atenção</span>
+  <span class="sc-legend-item"><span class="sc-icon green"></span> 100% Na meta</span>
+  <span class="sc-legend-item"><span class="sc-diamond"></span> 101–120% Acima</span>
+  <span class="sc-legend-item"><span class="sc-tri-up"></span> ≥ 121% Superado</span>
+  <span class="sc-legend-item"><span class="sc-icon gray"></span> Sem dado</span>
+</div>
+
+<div class="card">
+  <div class="sc-wrap">
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th class="left sticky" style="min-width:240px;left:0">Indicador</th>
+          <th class="left sticky" style="min-width:60px;left:240px">Unid.</th>
+          <th class="sticky" style="min-width:75px;left:300px">Real</th>
+          <th class="sticky" style="min-width:75px;left:375px">Meta</th>
+          <th class="sticky sticky-last" style="min-width:55px;left:450px">Δ%</th>
+          {% for m in months %}
+          <th class="sc-month-sep">{{ m[:1] }}</th>
+          {% endfor %}
+          <th class="sc-month-sep" style="font-weight:800;color:var(--text)">YT</th>
+        </tr>
+      </thead>
+      <tbody id="scorecardBody"></tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>{{ pag.total }} indicador{{ 's' if pag.total != 1 }} encontrado{{ 's' if pag.total != 1 }}</h2>
+    <span style="font-size:.8rem;color:var(--muted)">Página {{ pag.page }} de {{ pag.pages }}</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nome do Indicador</th><th>Unidade</th><th>Área</th>
+          <th>Tipo</th><th>Ano</th><th>Frequência</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ind in pag.items %}
+        <tr>
+          <td class="link-cell trunc">
+            <a href="{{ url_for('scorecard_detalhe', ind_id=ind.id) }}" title="{{ ind.nome }}">{{ ind.nome }}</a>
+          </td>
+          <td><span class="badge badge-blue">{{ ind.sigla_unidade[:6] }}</span></td>
+          <td>{{ ind.area_resultado }}</td>
+          <td><code style="font-size:.75rem;background:#f3f4f6;padding:2px 6px;border-radius:4px">{{ ind.tipo }}</code></td>
+          <td>{{ ind.plano_gestao }}</td>
+          <td>{{ ind.frequencia }}</td>
+          <td>
+            {% if ind.status == 'Ativo' %}
+              <span class="badge badge-green">Ativo</span>
+            {% else %}
+              <span class="badge badge-gray">Inativo</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px">Nenhum indicador encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-body" style="padding-top:0">
+    <div class="pagination">
+      {% if pag.has_prev %}
+        <a href="{{ url_for('scorecard', page=pag.prev_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f, view='table') }}">← Anterior</a>
+      {% endif %}
+      {% for p in pag.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+          {% if p == pag.page %}
+            <span class="current">{{ p }}</span>
+          {% else %}
+            <a href="{{ url_for('scorecard', page=p, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f, view='table') }}">{{ p }}</a>
+          {% endif %}
+        {% else %}
+          <span>…</span>
+        {% endif %}
+      {% endfor %}
+      {% if pag.has_next %}
+        <a href="{{ url_for('scorecard', page=pag.next_num, q=q, unidade=unidade, area=area, status=status_f, ano=ano_f, view='table') }}">Próximo →</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if view_mode == 'scorecard' %}
+<script>
+const SCORECARD = {{ scorecard_json | safe }};
+const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const tbody = document.getElementById('scorecardBody');
+
+function fmtNum(v) {
+  if (v === null || v === undefined) return '—';
+  return new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 1}).format(v);
+}
+function fmtDelta(d) {
+  if (d === null || d === undefined) return '—';
+  return (d >= 0 ? '+' : '') + d.toFixed(1) + '%';
+}
+function statusIcon(s) {
+  if (s === 'red')    return `<span class="sc-tri"></span>`;
+  if (s === 'yellow') return `<span class="sc-icon yellow"></span>`;
+  if (s === 'green')  return `<span class="sc-icon green"></span>`;
+  if (s === 'blue')   return `<span class="sc-diamond"></span>`;
+  if (s === 'orange') return `<span class="sc-tri-up"></span>`;
+  return `<span class="sc-icon gray"></span>`;
+}
+function statusLabel(s) {
+  const map = { red:'Abaixo da meta', yellow:'Atenção', green:'Na meta', blue:'Acima da meta', orange:'Muito acima', gray:'Sem dado' };
+  return map[s] || '—';
+}
+function statusColor(s) {
+  const map = { red:'#c0392b', yellow:'#d97706', green:'#16a34a', blue:'#2563eb', orange:'#ea580c', gray:'#9ca3af' };
+  return map[s] || '#9ca3af';
+}
+function computeYtd(monthly) {
+  const reas = monthly.filter(m => m.rea !== null && m.rea !== undefined);
+  const mets = monthly.filter(m => m.met !== null && m.met !== undefined);
+  if (!reas.length || !mets.length) return 'gray';
+  const ytdR = reas.reduce((a, b) => a + b.rea, 0);
+  const ytdM = mets.reduce((a, b) => a + b.met, 0);
+  if (!ytdM) return 'gray';
+  const pct = (ytdR / ytdM) * 100;
+  if (pct >= 121) return 'orange';
+  if (pct >= 101) return 'blue';
+  if (pct >= 100) return 'green';
+  if (pct >= 90)  return 'yellow';
+  return 'red';
+}
+
+/* ── Popup ── */
+let activePopup = null;
+function closePopup() {
+  if (activePopup) { activePopup.remove(); activePopup = null; }
+}
+document.addEventListener('click', e => {
+  if (activePopup && !activePopup.contains(e.target)) closePopup();
+});
+
+function showPopup(cell, indNome, monthIdx, monthData) {
+  closePopup();
+  const rea = monthData.rea;
+  const met = monthData.met;
+  const pct = (rea !== null && met !== null && met !== 0) ? ((rea / met) * 100) : null;
+  const s   = monthData.status;
+  const color = statusColor(s);
+
+  const popup = document.createElement('div');
+  popup.className = 'sc-popup';
+  popup.innerHTML = `
+    <div class="sc-popup-header">
+      <span>${MONTH_NAMES[monthIdx]}</span>
+      <button class="sc-popup-close" onclick="closePopup()">✕</button>
+    </div>
+    <div class="sc-popup-body">
+      <div class="sc-popup-indicator">${indNome}</div>
+      <div class="sc-popup-row">
+        <span class="sc-popup-label">Realizado</span>
+        <span class="sc-popup-value">${fmtNum(rea)}</span>
+      </div>
+      <div class="sc-popup-row">
+        <span class="sc-popup-label">Meta</span>
+        <span class="sc-popup-value">${fmtNum(met)}</span>
+      </div>
+      <div class="sc-popup-row" style="border-bottom:none">
+        <span class="sc-popup-label">% Atingimento</span>
+        <span class="sc-popup-pct" style="color:${color}">${pct !== null ? (pct >= 0 ? '' : '') + pct.toFixed(1) + '%' : '—'}</span>
+      </div>
+      <div style="text-align:center;margin-top:4px">
+        <span style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:.7rem;font-weight:700;background:${color}22;color:${color}">
+          ${statusLabel(s)}
+        </span>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+  activePopup = popup;
+
+  // Position near cell
+  const rect = cell.getBoundingClientRect();
+  const pw = popup.offsetWidth || 230;
+  const ph = popup.offsetHeight || 180;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  let top  = rect.bottom + 8 + window.scrollY;
+
+  if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+  if (left < 10) left = 10;
+  if (rect.bottom + ph + 16 > window.innerHeight) top = rect.top + window.scrollY - ph - 8;
+
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
+}
+
+/* ── Build table ── */
+let totalRows = 0;
+Object.entries(SCORECARD).forEach(([grp, inds]) => {
+  const grpRow = document.createElement('tr');
+  grpRow.className = 'sc-group-row';
+  grpRow.innerHTML = `<td colspan="18">
+    <span style="display:inline-flex;align-items:center;gap:6px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      ${grp}
+      <span style="font-weight:400;opacity:.55;font-size:.7rem;margin-left:4px">(${inds.length})</span>
+    </span>
+  </td>`;
+  tbody.appendChild(grpRow);
+
+  inds.forEach(ind => {
+    totalRows++;
+    const ytdS   = computeYtd(ind.monthly);
+    const ytdRea = ind.monthly.filter(m => m.rea != null).reduce((a,b) => a + b.rea, 0) || null;
+    const ytdMet = ind.monthly.filter(m => m.met != null).reduce((a,b) => a + b.met, 0) || null;
+    const ytdDelta = (ytdRea !== null && ytdMet) ? ((ytdRea / ytdMet) * 100 - 100) : null;
+
+    const tr = document.createElement('tr');
+
+    // Store all monthly data on the row for click updates
+    tr._indMonthly = ind.monthly;
+    tr._ytdRea     = ytdRea;
+    tr._ytdMet     = ytdMet;
+    tr._ytdDelta   = ytdDelta;
+
+    const deltaClass = ytdDelta === null ? '' : (ytdDelta >= 0 ? 'sc-delta-pos' : 'sc-delta-neg');
+
+    let html = `
+      <td class="sc-name sticky" style="left:0">
+        <a href="/scorecard/${ind.id}" title="${ind.nome}">${ind.nome}</a>
+      </td>
+      <td class="sticky" style="left:240px"><span class="badge badge-blue" style="font-size:.64rem">${(ind.unidade||'').substring(0,8)}</span></td>
+      <td class="sc-num sc-cell-rea sticky" style="left:300px">
+        <span class="sc-month-label" style="display:none"></span>
+        ${fmtNum(ytdRea)}
+      </td>
+      <td class="sc-num sc-cell-met sticky" style="left:375px">${fmtNum(ytdMet)}</td>
+      <td class="sc-num sc-cell-pct sticky sticky-last ${deltaClass}" style="left:450px">${fmtDelta(ytdDelta)}</td>
+    `;
+    ind.monthly.forEach((m, idx) => {
+      html += `<td class="sc-dot-cell sc-month-sep sc-clickable" data-idx="${idx}" data-rea="${m.rea}" data-met="${m.met}" data-status="${m.status}">${statusIcon(m.status)}</td>`;
+    });
+    html += `<td class="sc-dot-cell sc-month-sep sc-ytd-cell" style="background:#f0f4ff" title="Acumulado YTD">${statusIcon(ytdS)}</td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+});
+
+// ── Click handler: update REAL / META / Δ% columns in the same row ──
+tbody.addEventListener('click', e => {
+  const cell = e.target.closest('.sc-clickable');
+  if (!cell) return;
+
+  const tr = cell.closest('tr');
+  const monthly = tr._indMonthly;
+  const idx  = parseInt(cell.dataset.idx);
+  const rea  = cell.dataset.rea === 'null' || cell.dataset.rea === '' ? null : parseFloat(cell.dataset.rea);
+  const met  = cell.dataset.met === 'null' || cell.dataset.met === '' ? null : parseFloat(cell.dataset.met);
+  const pct  = (rea !== null && met) ? ((rea / met) * 100 - 100) : null;
+  const s    = cell.dataset.status;
+
+  // Check if already selected → deselect and restore YTD
+  const wasSelected = cell.classList.contains('selected');
+
+  // Clear all selected in this row
+  tr.querySelectorAll('.sc-clickable.selected').forEach(c => c.classList.remove('selected'));
+
+  const cellRea = tr.querySelector('.sc-cell-rea');
+  const cellMet = tr.querySelector('.sc-cell-met');
+  const cellPct = tr.querySelector('.sc-cell-pct');
+  const lbl     = cellRea.querySelector('.sc-month-label');
+
+  if (wasSelected) {
+    // Restore YTD values
+    lbl.style.display = 'none';
+    lbl.textContent = '';
+    cellRea.lastChild.textContent = fmtNum(tr._ytdRea);
+    cellMet.textContent = fmtNum(tr._ytdMet);
+    const ytdDelta = tr._ytdDelta;
+    cellPct.textContent = fmtDelta(ytdDelta);
+    cellPct.className = 'sc-num sc-cell-pct ' + (ytdDelta === null ? '' : ytdDelta >= 0 ? 'sc-delta-pos' : 'sc-delta-neg');
+    return;
+  }
+
+  // Mark selected
+  cell.classList.add('selected');
+
+  // Update columns with month values
+  lbl.style.display = 'block';
+  lbl.textContent   = MONTH_NAMES[idx].substring(0,3);
+  cellRea.lastChild.textContent = fmtNum(rea);
+  cellMet.textContent = fmtNum(met);
+  cellPct.textContent = fmtDelta(pct);
+  cellPct.className   = 'sc-num sc-cell-pct ' + (pct === null ? '' : pct >= 0 ? 'sc-delta-pos' : 'sc-delta-neg');
+
+  // Flash animation
+  [cellRea, cellMet, cellPct].forEach(c => {
+    c.style.background = '#fef9c3';
+    setTimeout(() => { c.style.background = ''; }, 400);
+  });
+});
+
+if (totalRows === 0) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td colspan="18" class="sc-empty">
+    Nenhum indicador encontrado. Ajuste os filtros ou importe uma planilha em Admin → Importar Planilha.
+  </td>`;
+  tbody.appendChild(tr);
+}
+</script>
+{% endif %}
+{% endblock %}

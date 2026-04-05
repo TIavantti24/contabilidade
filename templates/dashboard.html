@@ -50,7 +50,7 @@
 <div class="card">
   <div class="card-header">
     <h2>Unidades Gerenciais</h2>
-    <a href="{{ url_for('indicadores') }}" class="btn btn-outline btn-sm">Ver todos →</a>
+    <a href="{{ url_for('scorecard') }}" class="btn btn-outline btn-sm">Ver todos →</a>
   </div>
   <div class="card-body">
     <div class="table-wrap">
@@ -64,7 +64,7 @@
         <tbody>
           {% for ug, cnt in unidades %}
           <tr>
-            <td><a href="{{ url_for('indicadores', unidade=ug) }}" style="color:var(--red);text-decoration:none;font-weight:500">{{ ug }}</a></td>
+            <td><a href="{{ url_for('scorecard', unidade=ug) }}" style="color:var(--red);text-decoration:none;font-weight:500">{{ ug }}</a></td>
             <td>{{ cnt }}</td>
           </tr>
           {% endfor %}

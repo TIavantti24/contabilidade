@@ -238,14 +238,17 @@ def dashboard():
         username=session.get("username"), is_admin=session.get("is_admin"))
 
 @app.route("/indicadores")
+@app.route("/scorecard")
 @login_required
-def indicadores():
-    page     = request.args.get("page", 1, type=int)
+def scorecard():
+
     q        = request.args.get("q", "").strip()
     unidade  = request.args.get("unidade", "")
     area     = request.args.get("area", "")
     status_f = request.args.get("status", "")
     ano_f    = request.args.get("ano", "", type=str)
+    view_mode = request.args.get("view", "scorecard")  # scorecard | table
+
     query = Indicador.query
     if q:        query = query.filter(Indicador.nome.ilike(f"%{q}%"))
     if unidade:  query = query.filter_by(sigla_unidade=unidade)
@@ -254,19 +257,84 @@ def indicadores():
     if ano_f:
         try: query = query.filter_by(plano_gestao=int(ano_f))
         except ValueError: pass
-    pag          = query.paginate(page=page, per_page=20, error_out=False)
+
+    all_inds     = query.order_by(Indicador.area_resultado, Indicador.nome).all()
     all_unidades = [r[0] for r in db.session.query(Indicador.sigla_unidade).distinct().all()]
     all_areas    = [r[0] for r in db.session.query(Indicador.area_resultado).distinct().all()]
     all_anos     = sorted({r[0] for r in db.session.query(Indicador.plano_gestao).distinct().all()})
-    return render_template("indicadores.html",
+
+    # Build scorecard rows with monthly status
+    def _status(rea, met, melhor, tol_v, tol_a):
+        """Return 'green'|'yellow'|'red'|'blue'|'orange'|'gray'
+        Fixed 5-tier scale:
+          <= 89%  → red    🔻
+          90-99%  → yellow 🟨
+          100%    → green  🟢
+          101-120%→ blue   🔷
+          >= 121% → orange 🔺
+        """
+        if rea is None or met is None or met == 0:
+            return "gray"
+        if melhor and melhor.lower() == "menor":
+            pct = (met / rea * 100) if rea else 0
+        else:
+            pct = (rea / met) * 100
+        if pct >= 121:  return "orange"
+        if pct >= 101:  return "blue"
+        if pct >= 100:  return "green"
+        if pct >= 90:   return "yellow"
+        return "red"
+
+    def _delta(rea, met):
+        if rea is None or met is None or met == 0: return None
+        return ((rea - met) / abs(met)) * 100
+
+    scorecard_groups = {}
+    for ind in all_inds:
+        vals = json.loads(ind.valores_json or "{}")
+        monthly = []
+        for m in MONTHS:
+            rea = vals.get(f"rea_{m.lower()}")
+            met = vals.get(f"met_{m.lower()}")
+            monthly.append({
+                "rea": rea, "met": met,
+                "status": _status(rea, met, ind.melhor, ind.tolerancia_verde, ind.tolerancia_amar)
+            })
+        # YTD aggregates
+        reas = [v["rea"] for v in monthly if v["rea"] is not None]
+        mets = [v["met"] for v in monthly if v["met"] is not None]
+        ytd_rea = sum(reas) if reas else None
+        ytd_met = sum(mets) if mets else None
+        delta   = _delta(ytd_rea, ytd_met)
+
+        grp = ind.area_resultado or "Sem Área"
+        if grp not in scorecard_groups:
+            scorecard_groups[grp] = []
+        scorecard_groups[grp].append({
+            "id": ind.id, "nome": ind.nome,
+            "unidade": ind.sigla_unidade, "status": ind.status,
+            "ytd_rea": ytd_rea, "ytd_met": ytd_met,
+            "delta": delta, "monthly": monthly,
+            "melhor": ind.melhor,
+        })
+
+    scorecard_json = json.dumps(scorecard_groups)
+
+    # Pagination for table view
+    pag = query.paginate(page=request.args.get("page",1,type=int), per_page=20, error_out=False)
+
+    return render_template("scorecard.html",
         pag=pag, q=q, unidade=unidade, area=area,
-        status_f=status_f, ano_f=ano_f,
+        status_f=status_f, ano_f=ano_f, view_mode=view_mode,
         all_unidades=all_unidades, all_areas=all_areas, all_anos=all_anos,
+        scorecard_json=scorecard_json,
+        months=MONTHS,
         username=session.get("username"), is_admin=session.get("is_admin"))
 
 @app.route("/indicadores/<int:ind_id>")
+@app.route("/scorecard/<int:ind_id>")
 @login_required
-def indicador_detalhe(ind_id):
+def scorecard_detalhe(ind_id):
     ind = Indicador.query.get_or_404(ind_id)
     valores = json.loads(ind.valores_json or "{}")
     chart_data = {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}STRATWs{% endblock %} — CIMAPRA</title>
+  <title>{% block title %}INDICADORES{% endblock %} — CIMAPRA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
@@ -174,7 +174,7 @@
 <body>
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <span>STRATWs</span>
+      <span>INDICADORES</span>
       <small>CIMAPRA</small>
     </div>
     <nav class="nav">
@@ -182,9 +182,9 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Dashboard
       </a>
-      <a href="{{ url_for('indicadores') }}" class="{{ 'active' if request.endpoint in ('indicadores','indicador_detalhe') }}">
+      <a href="{{ url_for('scorecard') }}" class="{{ 'active' if request.endpoint in ('scorecard','scorecard_detalhe') }}"
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Indicadores
+        Scorecard
       </a>
       <a href="{{ url_for('custo_fixo') }}" class="{{ 'active' if request.endpoint == 'custo_fixo' }}">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
